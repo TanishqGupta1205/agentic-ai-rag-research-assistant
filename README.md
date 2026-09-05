@@ -24,38 +24,34 @@ The system retrieves relevant information from uploaded papers, evaluates whethe
 The application follows an agentic retrieval workflow:
 
 ```text
-                User Question
-                      │
-                      ▼
-              Query Embedding
-                      │
-                      ▼
-                FAISS Search
-                      │
-                      ▼
-             Relevant Chunks
-                      │
-                      ▼
-           Agent Evaluates Context
-                      │
-                ┌─────┴─────┐
-                │           │
-             Sufficient?   Not Enough
-                │           │
-               YES          ▼
-                │      Refine Query
-                │           │
-                │           ▼
-                │      Search Again
-                │           │
-                └───────────┘
-                      │
-                      ▼
-              Generate Answer
-                      │
-                      ▼
-             Source + Page Info
-```
+     User Question
+            ↓
+      Query Embedding
+            ↓
+       FAISS Search
+            ↓
+      Relevant Chunks
+            ↓
+ Context Relevance Evaluation
+            ↓
+       Agent Decision
+        ┌───┴───┐
+       NO      YES
+       ↓         ↓
+ Refine Query   Generate Answer
+       ↓             ↓
+  Search Again   Answer Relevance
+       │             ↓
+       │        Faithfulness
+       │             ↓
+       │      Source + Page Info
+       │
+       └─── Repeat (max 3 attempts)
+                  ↓
+        If still insufficient
+                  ↓
+          Return "Not enough
+           information found"
 
 ## 🛠️ Tech Stack
 
@@ -64,7 +60,7 @@ The application follows an agentic retrieval workflow:
 - **FAISS** — Vector similarity search
 - **Sentence Transformers** — Text embeddings
 - **Groq** — LLM inference
-- **PyMuPDF** — PDF text extraction
+- **PyPDF2** — PDF text extraction
 - **NumPy**
 - **python-dotenv**
 
@@ -86,14 +82,13 @@ research_agent/
 │   ├── faiss_index.py
 │   ├── retriever.py
 │   ├── llm.py
-│   └── agent.py
+│   ├── agent.py
+│   └── evaluator.py
 │
 ├── app.py
 ├── main.py
 ├── requirements.txt
-├── .env.example
 └── README.md
-```
 
 ## ⚙️ Setup
 
@@ -130,14 +125,6 @@ Create a `.env` file in the project root:
 GROQ_API_KEY=your_groq_api_key_here
 ```
 
-Do **not** upload your actual API key to GitHub.
-
-Use `.env.example` as a template:
-
-```env
-GROQ_API_KEY=your_groq_api_key_here
-```
-
 ## ▶️ Run the Application
 
 Start the Streamlit application:
@@ -155,11 +142,11 @@ Upload one or more research papers and start asking questions.
 You can ask questions such as:
 
 ```text
-What is deep learning?
-What is the difference between computer vision and image processing?
-What are the limitations discussed in this paper?
-Explain the main methodology used in the paper.
-What are the key findings?
+What is image processing according to the paper?
+What are the weaknesses of region-based segmentation?
+What problems are discussed in the paper?
+How does image segmentation affect object detection performance?
+What challenges does computer vision face according to the paper?
 ```
 
 ## 🤖 Agentic Behavior
@@ -175,9 +162,10 @@ The agent:
 5. Performs another retrieval attempt.
 6. Repeats the process for a limited number of attempts.
 7. Generates the final answer when sufficient information is found.
-8. Returns source and page references.
+8. Evaluates the generated answer using Context Relevance, Answer Relevance, and Faithfulness.
+9. Returns the answer along with source and page references.
 
-The Streamlit interface also provides a **View Agent Process** section so users can see the retrieval and evaluation workflow.
+The Streamlit interface also provides a **View Agent Process** section so users can see the retrieval, evaluation, query refinement, and answer-generation workflow.
 
 ## 📌 Source Attribution
 
@@ -208,13 +196,19 @@ venv/
 __pycache__/
 *.pyc
 ```
+## 📊 RAG Evaluation
+
+The system evaluates generated responses using three metrics:
+
+- **Context Relevance** — measures whether retrieved information is relevant to the user's question.
+- **Answer Relevance** — measures whether the generated answer directly addresses the question.
+- **Faithfulness** — measures whether the claims in the generated answer are supported by the retrieved context.
 
 ## 🔮 Future Improvements
 
 Planned improvements include:
 
 - Better retrieval and query refinement
-- RAG evaluation for context relevance, answer relevance, and faithfulness
 - Improved citation-aware answer generation
 - FastAPI backend
 - React frontend

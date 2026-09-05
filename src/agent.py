@@ -2,7 +2,7 @@ from src.retriever import retrieve_documents
 from src.llm import generate_answer
 from src.embeddings import embeddings_model
 from groq import Groq
-
+from src.evaluator import evaluate_context, evaluate_answer, evaluate_faithfulness
 MODEL = "openai/gpt-oss-20b"
 
 client = Groq()
@@ -26,14 +26,20 @@ Retrieved information:
 Determine whether the retrieved information contains relevant information
 that can be used to answer the user's question.
 
-The retrieved information must contain specific evidence
-that directly helps answer the user's question.
+The retrieved information does not need to contain a
+complete answer.
 
-Reply YES only if the retrieved information contains
-information that directly answers the question.
+Reply YES if the retrieved information contains one or more
+specific facts, problems, limitations, challenges, methods,
+results, or other evidence that can be combined to answer
+the user's question.
 
-Reply NO if the information is only generally related
-to the topic but does not actually contain an answer.
+For broad questions, partial but relevant evidence is enough
+to reply YES.
+
+Reply NO only if the retrieved information is mostly unrelated
+to the user's question and does not provide useful evidence
+for answering it.
 
 For example, if the question asks for "limitations",
 the context must contain actual limitations, challenges,
@@ -84,6 +90,12 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             top_k=8
         )
 
+        for i, doc in enumerate(retrieve_docs):
+            print(f"\n--- Retrieved Chunk {i+1} ---")
+            print(doc["text"])
+            print("Source:", doc["source"])
+            print("Page:", doc["page"])
+
         if not retrieve_docs:
             update("❌ No relevant information found")
 
@@ -99,8 +111,14 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             f"Content: {doc['text']}"
             for doc in retrieve_docs
         )
-
         update("🧠 Agent is evaluating the retrieved context")
+
+        context_score = evaluate_context(
+            current_query,
+            context
+        )
+
+        update(f"📊 Context Relevance Score: {context_score}")
 
         decision = check_context(
             current_query,
@@ -121,10 +139,22 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
                 MODEL
             )
 
+            answer_score = evaluate_answer(
+                query,
+                answer
+            )
+
+            update(f"📊 Answer Relevance Score: {answer_score}")
+            faithfulness_score = evaluate_faithfulness(
+                context,
+                answer
+            )
+
+            update(f"📊 Faithfulness Score: {faithfulness_score}")
+
             unique_sources = set()
 
             for doc in retrieve_docs:
-
                 unique_sources.add(
                     f"- {doc['source']} — Page {doc['page']}"
                 )
@@ -142,7 +172,7 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             update("🔄 Agent is refining the search query")
 
             current_query = refine_query(
-                query,
+                current_query,
                 context
             )
 
@@ -160,8 +190,8 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             )
 def refine_query(query, context):
     """
-    Agent creates a better search query when
-    retrieved information is not sufficient.
+    Agent creates a focused search query when
+    the retrieved information is not sufficient.
     """
 
     prompt = f"""
@@ -170,28 +200,42 @@ You are a research retrieval agent.
 User question:
 {query}
 
-The previous retrieved context was not sufficient.
-
 Previous retrieved context:
 {context}
 
-Create a better search query to find the specific information
-needed to answer the user's question.
+The previous context was not sufficient to answer the question.
 
-IMPORTANT RULES:
+Create a NEW, focused search query that should retrieve
+the specific evidence needed from the research paper.
 
-1. Do NOT search for the paper title.
-2. Do NOT search for author names.
-3. Do NOT search for words like "PDF", "2018", or "paper review".
-4. Identify the main information the user is asking for.
-5. Use specific concepts, keywords, and related terms that are
-likely to appear in the relevant section of the document.
-6. If the question asks about problems, use terms such as:
-   limitations, challenges, weaknesses, errors, performance,
-   accuracy, difficulties, constraints, noise.
-7. Keep the query concise and focused.
+First identify what information the user is asking for.
 
-Return ONLY the improved search query.
+If the question asks about problems, limitations, challenges,
+or weaknesses, search for specific evidence such as:
+limitations, challenges, weaknesses, drawbacks, errors,
+accuracy problems, noise, segmentation problems,
+object detection errors, performance issues, constraints.
+
+If the question asks about objectives, search for:
+objectives, goals, aims, purpose.
+
+If the question asks about methodology, search for:
+methodology, method, approach, algorithm, technique,
+architecture, implementation.
+
+If the question asks about results, search for:
+results, findings, performance, accuracy, evaluation.
+
+IMPORTANT:
+- Focus on the information requested by the user.
+- Use concepts likely to appear in the paper.
+- Do NOT search for the paper title.
+- Do NOT search for author names.
+- Do NOT search for PDF, year, or paper review.
+- Do NOT simply repeat the original question.
+- Keep the query specific and concise.
+- Return ONLY the search query.
+
 """
 
     response = client.chat.completions.create(
