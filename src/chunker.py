@@ -18,5 +18,4 @@ def create_chunks(pages, source):
                 "page": page_number,
                 "source": source
             })
-
     return chunks
