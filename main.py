@@ -5,38 +5,65 @@ from src.faiss_index import create_faiss_index
 from src.agent import run_agent
 from pathlib import Path
 
-pdf_folder = Path("data/papers")
-pdf_files=list(pdf_folder.glob("*.pdf"))
-print("Total PDFs:", len(pdf_files))
+
+def build_rag():
+
+    pdf_folder = Path("data/papers")
+
+    pdf_files = list(pdf_folder.glob("*.pdf"))
+
+    print("Total PDFs:", len(pdf_files))
+
+    all_chunks = []
+
+    for pdf_path in pdf_files:
+
+        print(f"\nProcessing: {pdf_path.name}")
+
+        pages = extract_text_from_pdf(str(pdf_path))
+
+        print("Total pages:", len(pages))
+
+        chunks = create_chunks(
+            pages,
+            pdf_path.name
+        )
+        print("Total chunks:", len(chunks))
+
+        all_chunks.extend(chunks)
+
+    documents = [
+        chunk["text"]
+        for chunk in all_chunks
+    ]
+
+    chunk_embeddings = create_embeddings(
+        documents
+    )
+
+    print("Embeddings created")
+
+    index = create_faiss_index(
+        chunk_embeddings
+    )
+
+    print("FAISS index created")
+
+    return index, documents, all_chunks
 
 
-all_chunks=[]
-for pdf_path in pdf_files:
-    print(f"\nProcessing:{pdf_path.name}")
-    pages=extract_text_from_pdf(str(pdf_path))
-    print("Total pages:",len(pages))
-    chunks=create_chunks(pages,pdf_path.name)
-    print("Total chunks:",len(chunks))
-    all_chunks.extend(chunks)
+if __name__ == "__main__":
 
-# 3. Get text from chunks
-documents = [chunk["text"] for chunk in all_chunks]
-# 4. Create embeddings
-chunk_embeddings = create_embeddings(documents)
+    index, documents, all_chunks = build_rag()
 
-print("Embeddings created")
+    query = input("\nAsk your question: ")
 
+    answer = run_agent(
+        query,
+        index,
+        documents,
+        all_chunks
+    )
 
-# 5. Create FAISS index
-index = create_faiss_index(chunk_embeddings)
-
-print("FAISS index created")
-query=input("\nAsk your question:")
-answer=run_agent(
-    query,
-    index,
-    documents,
-    all_chunks
-)
-print("\n Final answer:")
-print(answer)
+    print("\nFinal answer:")
+    print(answer)

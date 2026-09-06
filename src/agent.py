@@ -64,10 +64,10 @@ NO
     decision = response.choices[0].message.content.strip().upper()
 
     return decision
-
 def run_agent(query, index, documents, all_chunks, progress_callback=None):
 
     def update(message):
+
         if progress_callback:
             progress_callback(message)
 
@@ -91,15 +91,23 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
         )
 
         for i, doc in enumerate(retrieve_docs):
+
             print(f"\n--- Retrieved Chunk {i+1} ---")
             print(doc["text"])
             print("Source:", doc["source"])
             print("Page:", doc["page"])
 
         if not retrieve_docs:
+
             update("❌ No relevant information found")
 
-            return "I could not find relevant information in the research papers."
+            return {
+                "answer": "I could not find relevant information in the research papers.",
+                "sources": [],
+                "context_score": 0,
+                "answer_score": 0,
+                "faithfulness_score": 0
+            }
 
         update(
             f"📚 Retrieved {len(retrieve_docs)} relevant sections"
@@ -111,6 +119,7 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             f"Content: {doc['text']}"
             for doc in retrieve_docs
         )
+
         update("🧠 Agent is evaluating the retrieved context")
 
         context_score = evaluate_context(
@@ -118,14 +127,18 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             context
         )
 
-        update(f"📊 Context Relevance Score: {context_score}")
+        update(
+            f"📊 Context Relevance Score: {context_score}"
+        )
 
         decision = check_context(
             current_query,
             context
         )
 
-        update(f"🤖 Context evaluation: {decision}")
+        update(
+            f"🤖 Context evaluation: {decision}"
+        )
 
         if decision == "YES":
 
@@ -144,17 +157,23 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
                 answer
             )
 
-            update(f"📊 Answer Relevance Score: {answer_score}")
+            update(
+                f"📊 Answer Relevance Score: {answer_score}"
+            )
+
             faithfulness_score = evaluate_faithfulness(
                 context,
                 answer
             )
 
-            update(f"📊 Faithfulness Score: {faithfulness_score}")
+            update(
+                f"📊 Faithfulness Score: {faithfulness_score}"
+            )
 
             unique_sources = set()
 
             for doc in retrieve_docs:
+
                 unique_sources.add(
                     f"- {doc['source']} — Page {doc['page']}"
                 )
@@ -163,7 +182,13 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
 
             update("✅ Answer generated successfully")
 
-            return answer + "\n\nSources:\n" + sources
+            return {
+                "answer": answer,
+                "sources": sources,
+                "context_score": context_score,
+                "answer_score": answer_score,
+                "faithfulness_score": faithfulness_score
+            }
 
         update("⚠️ Information is not sufficient")
 
@@ -184,10 +209,16 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
 
             update("🛑 Maximum search attempts reached")
 
-            return (
-                "I could not find enough information "
-                "in the research papers to answer this question."
-            )
+            return {
+                "answer": (
+                    "I could not find enough information "
+                    "in the research papers to answer this question."
+                ),
+                "sources": "",
+                "context_score": context_score,
+                "answer_score": 0,
+                "faithfulness_score": 0
+            }
 def refine_query(query, context):
     """
     Agent creates a focused search query when
