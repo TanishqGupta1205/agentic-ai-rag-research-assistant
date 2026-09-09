@@ -66,13 +66,16 @@ NO
     return decision
 def run_agent(query, index, documents, all_chunks, progress_callback=None):
 
+    process_steps = []
+
     def update(message):
+
+        process_steps.append(message)
 
         if progress_callback:
             progress_callback(message)
 
         print(message)
-
     update("🔍 Agent received your question")
 
     current_query = query
@@ -106,7 +109,8 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
                 "sources": [],
                 "context_score": 0,
                 "answer_score": 0,
-                "faithfulness_score": 0
+                "faithfulness_score": 0,
+                "process": process_steps
             }
 
         update(
@@ -181,13 +185,13 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             sources = "\n".join(unique_sources)
 
             update("✅ Answer generated successfully")
-
             return {
                 "answer": answer,
                 "sources": sources,
                 "context_score": context_score,
                 "answer_score": answer_score,
-                "faithfulness_score": faithfulness_score
+                "faithfulness_score": faithfulness_score,
+                "process": process_steps
             }
 
         update("⚠️ Information is not sufficient")
@@ -217,7 +221,8 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
                 "sources": "",
                 "context_score": context_score,
                 "answer_score": 0,
-                "faithfulness_score": 0
+                "faithfulness_score": 0,
+                "process": process_steps
             }
 def refine_query(query, context):
     """

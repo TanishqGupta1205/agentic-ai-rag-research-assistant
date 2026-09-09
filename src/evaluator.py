@@ -71,51 +71,40 @@ Return ONLY the number.
 
     return score
 
-
 def evaluate_faithfulness(context, answer):
-    """
-    Checks whether the claims in the generated answer 
-    are supported by the retrieved context.
-    """
-    prompt=f"""
-You are evaluating the faithfulness of a RAG system.
+    prompt = f"""
+You are evaluating the faithfulness of a RAG answer.
 
 Retrieved context:
 {context}
+
 Generated answer:
 {answer}
 
-Break the generated answer into its main factual claims.
+Does the answer contain claims that are supported by the retrieved context?
 
-For each claim, determine whether it is directly supported by the retrieved context.
+Give a score from 0 to 1.
 
-Calculate a faithfulness score from 0 to 1:
+0 = unsupported
+0.5 = partially supported
+1 = fully supported
 
-1 = all important claims are directly supported
-0.75 = most claims are supported
-0.5 = about half of the claims are supported
-0.25 = very few claims are supported
-0 = none of the claims are supported
-
-Important:
-- Do NOT use general knowledge.
-- Do NOT assume information that is not present in the context.
-- A claim must be supported by the retrieved context itself.
-- Do not judge writing quality or answer relevance.
-
-Return ONLY the final numerical score.
+Return ONLY the number.
 """
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
 
-    score = response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
 
-    return score
+        return response.choices[0].message.content.strip()
 
+    except Exception as e:
+        print("Faithfulness evaluation failed:", e)
+        return "N/A"

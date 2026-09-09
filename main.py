@@ -3,10 +3,39 @@ from src.chunker import create_chunks
 from src.embeddings import create_embeddings
 from src.faiss_index import create_faiss_index
 from src.agent import run_agent
+
 from pathlib import Path
+import pickle
+import faiss
+
+
+INDEX_FILE = Path("data/faiss.index")
+CHUNKS_FILE = Path("data/chunks.pkl")
 
 
 def build_rag():
+
+    # Check whether a saved RAG index already exists
+    if INDEX_FILE.exists() and CHUNKS_FILE.exists():
+
+        print("Loading saved RAG index...")
+
+        index = faiss.read_index(str(INDEX_FILE))
+
+        with open(CHUNKS_FILE, "rb") as f:
+            all_chunks = pickle.load(f)
+
+        documents = [
+            chunk["text"]
+            for chunk in all_chunks
+        ]
+
+        print("Saved RAG index loaded.")
+
+        return index, documents, all_chunks
+
+
+    print("Building RAG index for the first time...")
 
     pdf_folder = Path("data/papers")
 
@@ -14,7 +43,7 @@ def build_rag():
 
     print("Total PDFs:", len(pdf_files))
 
-    all_chunks = []
+    all_chunks = [] 
 
     for pdf_path in pdf_files:
 
@@ -28,14 +57,17 @@ def build_rag():
             pages,
             pdf_path.name
         )
+
         print("Total chunks:", len(chunks))
 
         all_chunks.extend(chunks)
+
 
     documents = [
         chunk["text"]
         for chunk in all_chunks
     ]
+
 
     chunk_embeddings = create_embeddings(
         documents
@@ -43,11 +75,31 @@ def build_rag():
 
     print("Embeddings created")
 
+
     index = create_faiss_index(
         chunk_embeddings
     )
 
     print("FAISS index created")
+
+
+    # Save FAISS index
+    faiss.write_index(
+        index,
+        str(INDEX_FILE)
+    )
+
+
+    # Save chunks
+    with open(CHUNKS_FILE, "wb") as f:
+
+        pickle.dump(
+            all_chunks,
+            f
+        )
+
+
+    print("RAG index saved.")
 
     return index, documents, all_chunks
 
@@ -58,7 +110,7 @@ if __name__ == "__main__":
 
     query = input("\nAsk your question: ")
 
-    answer = run_agent(
+    result = run_agent(
         query,
         index,
         documents,
@@ -66,4 +118,4 @@ if __name__ == "__main__":
     )
 
     print("\nFinal answer:")
-    print(answer)
+    print(result)
