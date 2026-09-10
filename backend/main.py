@@ -11,7 +11,6 @@ import tempfile
 import pickle
 import faiss
 
-
 app = FastAPI()
 
 
@@ -126,8 +125,6 @@ async def upload_pdfs(files: list[UploadFile] = File(...)):
     new_embeddings = create_embeddings(
         new_documents
     )
-
-    print("New embeddings created")
 
     # Add new chunks to existing data
     all_chunks.extend(new_chunks)

@@ -72,7 +72,7 @@ def retrieve_documents(query, embeddings_model, index, documents, all_chunks, to
         key=lambda x: x[1]
     )
 
-    semantic_candidates = candidates[:20]
+    semantic_candidates = candidates[:50]
 
     # Then use keywords to rerank only those candidates
     semantic_candidates.sort(

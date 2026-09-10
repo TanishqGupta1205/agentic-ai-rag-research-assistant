@@ -257,3 +257,22 @@ body {
   font-size: 14px;
   line-height: 1.4;
 }
+
+.upload-status{
+  margin-top:10px;
+  font-size:14px;
+  font-weight: 500;
+}
+
+.question-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.question-error {
+  width: 100%;
+  margin: 0;
+  color: #d32f2f;
+  font-size: 14px;
+}

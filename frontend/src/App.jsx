@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 
@@ -18,10 +18,13 @@ function App() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [documents, setDocuments] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
-
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [questionError, setQuestionError] = useState("");
+  const fileInputRef = useRef(null);
   // Ask a question
   const askQuestion = async () => {
     if (!question.trim()) {
+      setQuestionError("Please enter a question");
       return;
     }
 
@@ -78,8 +81,8 @@ function App() {
         },
       ]);
 
-      // Clear input after successful question
       setQuestion("");
+      setQuestionError("");
 
     } catch (error) {
       console.error(error);
@@ -96,17 +99,26 @@ function App() {
       setUploadMessage("Please select a PDF first.");
       return;
     }
-
+    if (
+      file.type !== "application/pdf" &&
+      !file.name.toLowerCase().endsWith(".pdf")
+    ) {
+      setUploadMessage("Please upload a PDF file.");
+      setUploadStatus("Upload failed.");
+      return;
+    }
     if (uploading) {
       return;
     }
 
     setUploading(true);
-    setUploadMessage("Uploading PDF...");
-
+    setUploadStatus("Uploading PDF...");
     const formData = new FormData();
     formData.append("files", file);
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
+
+    setUploadStatus("Processing PDF...");
     try {
       const response = await fetch("http://localhost:8000/upload", {
         method: "POST",
@@ -117,6 +129,7 @@ function App() {
 
       if (!response.ok) {
         setUploadMessage(data.detail || "Upload failed.");
+        setUploadStatus("Upload failed.");
         return;
       }
 
@@ -133,17 +146,17 @@ function App() {
               newDocuments.push(uploadedFile);
             }
           });
-
           return newDocuments;
         });
       }
-
+      setUploadStatus("PDF ready ✓");
       // Clear selected file
       setFile(null);
 
     } catch (error) {
       console.error(error);
       setUploadMessage("Error connecting to the backend.");
+      setUploadStatus("Upload failed.");
 
     } finally {
       setUploading(false);
@@ -152,6 +165,12 @@ function App() {
 
   // Clear documents
   const clearDocuments = async () => {
+    const confirmClear=window.confirm(
+      "Are you sure you want to clear all documents and chat history?"
+    );
+    if(!confirm){
+      return;
+    }
     try {
       const response = await fetch("http://localhost:8000/clear", {
         method: "DELETE",
@@ -172,10 +191,12 @@ function App() {
       setContextScore("");
       setAnswerScore("");
       setFaithfulnessScore("");
-
       setQuestion("");
+      setUploadStatus("");
       setFile(null);
-
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       setUploadMessage(
         data.message || "Documents cleared successfully."
       );
@@ -203,13 +224,36 @@ function App() {
         {/* Upload Section */}
         <div className="upload-section">
           <h2>Upload Research Paper</h2>
-
           <input
-            type="file"
-            accept=".pdf"
-            onChange={(e) => setFile(e.target.files[0])}
-            disabled={uploading}
-          />
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          onChange={(e) => {
+            const selectedFile = e.target.files[0];
+
+            if (!selectedFile) {
+              return;
+            }
+
+            if (
+              selectedFile.type !== "application/pdf" &&
+              !selectedFile.name.toLowerCase().endsWith(".pdf")
+            ) {
+              setFile(null);
+              setUploadMessage("Please upload a PDF file.");
+
+              if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+              }
+
+              return;
+            }
+
+            setFile(selectedFile);
+            setUploadMessage("");
+          }}
+          disabled={uploading}
+        />
 
           <button
             type="button"
@@ -218,12 +262,17 @@ function App() {
           >
             {uploading ? "Uploading..." : "Upload PDF"}
           </button>
-
           {uploadMessage && (
-            <p>{uploadMessage}</p>
-          )}
+  <p className="upload-message">
+    {uploadMessage}
+  </p>
+)}
         </div>
-
+        {uploadStatus && (
+          <p className="upload-status">
+            {uploadStatus}
+          </p>
+        )}
         {/* Documents Section */}
         <div className="documents-section">
           <div className="documents-header">
@@ -263,6 +312,7 @@ function App() {
             Research agent is working...
           </div>
         )}
+
 
         {/* Chat History */}
         {chatHistory.length > 0 && (
@@ -385,7 +435,10 @@ function App() {
                 : "Ask a question about your research papers..."
             }
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(e) => {
+              setQuestion(e.target.value);
+              setQuestionError("");
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 askQuestion();
@@ -406,6 +459,11 @@ function App() {
           >
             {loading ? "Searching..." : "Ask"}
           </button>
+            {questionError && (
+            <p className="question-error">
+              {questionError}
+            </p>
+          )}
         </div>
 
       </div>
