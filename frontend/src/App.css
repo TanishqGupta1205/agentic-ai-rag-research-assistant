@@ -177,6 +177,7 @@ body {
   align-items: start;
   margin-bottom: 20px;
 }
+
 .answer-card,
 .info-card {
   background: white;
@@ -192,6 +193,8 @@ body {
 
 .answer-card h2 {
   font-size: 24px;
+  text-align: left;
+  margin-top: 0;
 }
 
 .info-card h3 {
@@ -204,47 +207,37 @@ body {
 ========================= */
 
 .answer {
+  width: 100%;
+  max-width: none;
+  text-align: left;
   line-height: 1.7;
   font-size: 15px;
   color: #374151;
+}
+
+.answer p {
+  margin: 0 0 16px;
+  text-align: left;
+}
+
+.answer ul,
+.answer ol {
+  margin: 8px 0 18px;
+  padding-left: 25px;
+  text-align: left;
+}
+
+.answer li {
+  margin-bottom: 8px;
+  text-align: left;
 }
 
 .answer h1,
 .answer h2,
 .answer h3 {
   text-align: left;
-}
-
-.answer p {
-  margin: 0 0 14px;
-}
-
-.answer ul,
-.answer ol {
-  padding-left: 22px;
-}
-
-.answer li {
-  margin-bottom: 7px;
-}
-
-.answer table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 18px 0;
-  font-size: 14px;
-}
-
-.answer th,
-.answer td {
-  border: 1px solid #d1d5db;
-  padding: 9px;
-  text-align: left;
-}
-
-.answer th {
-  font-weight: 700;
-  background: #f7f8fa;
+  margin-top: 22px;
+  margin-bottom: 10px;
 }
 
 /* =========================
@@ -347,13 +340,13 @@ body {
 ========================= */
 
 .sources p {
-  margin: 0 0 8px;
-  padding: 9px 11px;
+  margin: 0 0 6px;
+  padding: 8px 10px;
   background: #f7f8fa;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .sources p:last-child {
@@ -383,6 +376,17 @@ body {
   margin-top: 24px;
 }
 
+.question-card button {
+  padding: 14px 20px;
+  min-width: 90px;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  background: #2563eb;
+  color: white;
+} 
 .question-card input {
   flex: 1;
   min-width: 0;

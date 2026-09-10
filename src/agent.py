@@ -76,6 +76,7 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             progress_callback(message)
 
         print(message)
+
     update("🔍 Agent received your question")
 
     current_query = query
@@ -179,12 +180,21 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
             for doc in retrieve_docs:
 
                 unique_sources.add(
-                    f"- {doc['source']} — Page {doc['page']}"
+                    (doc["source"], doc["page"])
                 )
 
-            sources = "\n".join(unique_sources)
+            sorted_sources = sorted(
+                unique_sources,
+                key=lambda x: (x[0], x[1])
+            )
+
+            sources = "\n".join(
+                f"{source} — Page {page}"
+                for source, page in sorted_sources
+            )
 
             update("✅ Answer generated successfully")
+
             return {
                 "answer": answer,
                 "sources": sources,
@@ -224,6 +234,7 @@ def run_agent(query, index, documents, all_chunks, progress_callback=None):
                 "faithfulness_score": 0,
                 "process": process_steps
             }
+        
 def refine_query(query, context):
     """
     Agent creates a focused search query when

@@ -22,7 +22,22 @@ function App() {
   const [questionError, setQuestionError] = useState("");
   const [agentProcess, setAgentProcess] = useState([]);
   const [openAgentProcess, setOpenAgentProcess] = useState(null);
+
   const fileInputRef = useRef(null);
+
+  const formatScore = (score) => {
+    if (score === "" || score === null || score === undefined) {
+      return "N/A";
+    }
+
+    const number = Number(score);
+
+    if (Number.isNaN(number)) {
+      return "N/A";
+    }
+
+    return `${number.toFixed(1)}/1.0`;
+  };
 
   // Ask a question
   const askQuestion = async () => {
@@ -42,10 +57,12 @@ function App() {
 
     const currentQuestion = question.trim();
     let currentProcess = [];
+
     setLoading(true);
     setQuestionError("");
     setUploadMessage("");
     setAgentProcess([]);
+
     try {
       const response = await fetch(
         "http://localhost:8000/ask-stream",
@@ -59,11 +76,14 @@ function App() {
           }),
         }
       );
+
       if (!response.ok) {
         const errorText = await response.text();
+
         setQuestionError(
           errorText || "Failed to connect to the research agent."
         );
+
         return;
       }
 
@@ -115,7 +135,6 @@ function App() {
 
             setAgentProcess([...currentProcess]);
 
-            // Allow React to render each step
             await new Promise((resolve) =>
               setTimeout(resolve, 10)
             );
@@ -156,19 +175,20 @@ function App() {
             const message = JSON.parse(eventData);
 
             currentProcess.push(`❌ ${message}`);
+
             setAgentProcess([...currentProcess]);
+
             setQuestionError(message);
           }
         }
       }
-    }
-    catch (error) {
+    } catch (error) {
       console.error(error);
+
       setQuestionError(
         error.message || "Unable to connect to the backend."
       );
-    } 
-    finally {
+    } finally {
       setLoading(false);
     }
   };
@@ -203,7 +223,7 @@ function App() {
       setTimeout(resolve, 500)
     );
 
-    setUploadStatus("Processing PDF...");
+    setUploadStatus("Processing PDF and building search index...");
 
     try {
       const response = await fetch(
@@ -217,8 +237,12 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        setUploadMessage(data.detail || "Upload failed.");
+        setUploadMessage(
+          data.detail || "Upload failed."
+        );
+
         setUploadStatus("Upload failed.");
+
         return;
       }
 
@@ -242,7 +266,6 @@ function App() {
 
       setUploadStatus("PDF ready ✓");
 
-      // Clear selected file
       setFile(null);
 
       if (fileInputRef.current) {
@@ -250,7 +273,11 @@ function App() {
       }
     } catch (error) {
       console.error(error);
-      setUploadMessage("Error connecting to the backend.");
+
+      setUploadMessage(
+        "Error connecting to the backend."
+      );
+
       setUploadStatus("Upload failed.");
     } finally {
       setUploading(false);
@@ -278,7 +305,10 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        setUploadMessage("Failed to clear documents.");
+        setUploadMessage(
+          "Failed to clear documents."
+        );
+
         return;
       }
 
@@ -290,22 +320,29 @@ function App() {
       setContextScore("");
       setAnswerScore("");
       setFaithfulnessScore("");
+
       setQuestion("");
       setQuestionError("");
+
       setUploadStatus("");
       setAgentProcess([]);
       setFile(null);
+      setOpenAgentProcess(null);
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
 
       setUploadMessage(
-        data.message || "Documents cleared successfully."
+        data.message ||
+          "Documents cleared successfully."
       );
     } catch (error) {
       console.error(error);
-      setUploadMessage("Error connecting to the backend.");
+
+      setUploadMessage(
+        "Error connecting to the backend."
+      );
     }
   };
 
@@ -315,11 +352,13 @@ function App() {
 
         {/* Header */}
         <header className="header">
-          <h1>Agentic RAG Research Assistant</h1>
+          <h1>
+            Agentic RAG Research Assistant
+          </h1>
 
           <p>
-            Ask questions about your research papers and get
-            grounded answers with sources.
+            Ask questions about your research papers
+            and get grounded answers with sources.
           </p>
         </header>
 
@@ -332,19 +371,22 @@ function App() {
             type="file"
             accept=".pdf,application/pdf"
             onChange={(e) => {
-              const selectedFile = e.target.files[0];
+              const selectedFile =
+                e.target.files[0];
 
               if (!selectedFile) {
                 return;
               }
 
               if (
-                selectedFile.type !== "application/pdf" &&
+                selectedFile.type !==
+                  "application/pdf" &&
                 !selectedFile.name
                   .toLowerCase()
                   .endsWith(".pdf")
               ) {
                 setFile(null);
+
                 setUploadMessage(
                   "Please upload a PDF file."
                 );
@@ -358,6 +400,7 @@ function App() {
 
               setFile(selectedFile);
               setUploadMessage("");
+              setUploadStatus("");
             }}
             disabled={uploading}
           />
@@ -367,7 +410,9 @@ function App() {
             onClick={uploadPDF}
             disabled={uploading}
           >
-            {uploading ? "Uploading..." : "Upload PDF"}
+            {uploading
+              ? "Uploading..."
+              : "Upload PDF"}
           </button>
 
           {uploadMessage && (
@@ -375,27 +420,30 @@ function App() {
               {uploadMessage}
             </p>
           )}
-        </div>
 
-        {uploadStatus && (
-          <p className="upload-status">
-            {uploadStatus}
-          </p>
-        )}
+          {uploadStatus && (
+            <div className="upload-status">
+              {uploadStatus}
+            </div>
+          )}
+        </div>
 
         {/* Documents Section */}
         <div className="documents-section">
           <div className="documents-header">
+
             <h2>Documents</h2>
 
             <button
               onClick={clearDocuments}
               disabled={
-                documents.length === 0 || uploading
+                documents.length === 0 ||
+                uploading
               }
             >
               Clear Documents
             </button>
+
           </div>
 
           {documents.length === 0 ? (
@@ -404,14 +452,18 @@ function App() {
             </p>
           ) : (
             <div className="document-list">
-              {documents.map((document, index) => (
-                <div
-                  className="document-item"
-                  key={index}
-                >
-                  ✓ {document}
-                </div>
-              ))}
+
+              {documents.map(
+                (document, index) => (
+                  <div
+                    className="document-item"
+                    key={index}
+                  >
+                    ✓ {document}
+                  </div>
+                )
+              )}
+
             </div>
           )}
         </div>
@@ -438,7 +490,10 @@ function App() {
 
                   <div className="question">
                     <h3>You</h3>
-                    <p>{chat.question}</p>
+
+                    <p>
+                      {chat.question}
+                    </p>
                   </div>
 
                   <hr />
@@ -456,54 +511,67 @@ function App() {
                 {/* Right Panel */}
                 <aside className="side-panel">
 
-
                   {/* Agent Process */}
-              <div className="info-card">
-                <h3>Agent Process</h3>
+                  <div className="info-card">
 
-                <button
-                  className="view-process-button"
-                  onClick={() => {
-                    setOpenAgentProcess(
-                      openAgentProcess === index ? null : index
-                    );
-                  }}
-                >
-                  {openAgentProcess === index
-                    ? "Hide Agent Process ▲"
-                    : "View Agent Process ▼"}
-                </button>
+                    <h3>Agent Process</h3>
 
-                {openAgentProcess === index && (
-                  <div className="agent-process">
-                    {chat.agentProcess &&
-                    chat.agentProcess.length > 0 ? (
-                      chat.agentProcess.map(
-                        (step, stepIndex) => (
-                          <div
-                            className="process-step"
-                            key={stepIndex}
-                          >
-                            {step}
-                          </div>
-                        )
-                      )
-                    ) : (
-                      <p>No process information available.</p>
+                    <button
+                      className="view-process-button"
+                      onClick={() => {
+                        setOpenAgentProcess(
+                          openAgentProcess === index
+                            ? null
+                            : index
+                        );
+                      }}
+                    >
+                      {openAgentProcess === index
+                        ? "Hide Agent Process ▲"
+                        : "View Agent Process ▼"}
+                    </button>
+
+                    {openAgentProcess === index && (
+                      <div className="agent-process">
+
+                        {chat.agentProcess &&
+                        chat.agentProcess.length > 0 ? (
+                          chat.agentProcess.map(
+                            (step, stepIndex) => (
+                              <div
+                                className="process-step"
+                                key={stepIndex}
+                              >
+                                {step}
+                              </div>
+                            )
+                          )
+                        ) : (
+                          <p>
+                            No process information
+                            available.
+                          </p>
+                        )}
+
+                      </div>
                     )}
+
                   </div>
-                )}
-              </div>
+
                   {/* Evaluation */}
                   <div className="info-card">
+
                     <h3>Evaluation</h3>
 
                     <div className="score">
                       <span>
                         Context Relevance
                       </span>
+
                       <strong>
-                        {chat.contextScore || "N/A"}
+                        {formatScore(
+                          chat.contextScore
+                        )}
                       </strong>
                     </div>
 
@@ -511,8 +579,11 @@ function App() {
                       <span>
                         Answer Relevance
                       </span>
+
                       <strong>
-                        {chat.answerScore || "N/A"}
+                        {formatScore(
+                          chat.answerScore
+                        )}
                       </strong>
                     </div>
 
@@ -520,24 +591,33 @@ function App() {
                       <span>
                         Faithfulness
                       </span>
+
                       <strong>
-                        {chat.faithfulnessScore || "N/A"}
+                        {formatScore(
+                          chat.faithfulnessScore
+                        )}
                       </strong>
                     </div>
+
                   </div>
 
                   {/* Sources */}
                   <div className="info-card">
+
                     <h3>Sources</h3>
 
                     <div className="sources">
+
                       {chat.sources ? (
                         chat.sources
                           .split("\n")
                           .map(
                             (source, sourceIndex) => (
                               <p key={sourceIndex}>
-                                {source}
+                                {source.replace(
+                                  /^-\s*/,
+                                  ""
+                                )}
                               </p>
                             )
                           )
@@ -546,7 +626,9 @@ function App() {
                           No sources available.
                         </p>
                       )}
+
                     </div>
+
                   </div>
 
                 </aside>
@@ -560,29 +642,36 @@ function App() {
         {/* Live Agent Process */}
         {loading && (
           <div className="info-card">
+
             <h3>Agent Process</h3>
 
             <div className="agent-process">
+
               {agentProcess.length === 0 ? (
                 <div className="process-step">
                   Starting agent...
                 </div>
               ) : (
-                agentProcess.map((step, index) => (
-                  <div
-                    className="process-step"
-                    key={index}
-                  >
-                    {step}
-                  </div>
-                ))
+                agentProcess.map(
+                  (step, index) => (
+                    <div
+                      className="process-step"
+                      key={index}
+                    >
+                      {step}
+                    </div>
+                  )
+                )
               )}
+
             </div>
+
           </div>
         )}
 
-        {/* Question Section - stays at bottom */}
+        {/* Question Section */}
         <div className="question-card">
+
           <input
             type="text"
             placeholder={
@@ -601,7 +690,8 @@ function App() {
               }
             }}
             disabled={
-              documents.length === 0 || loading
+              documents.length === 0 ||
+              loading
             }
           />
 
@@ -613,7 +703,9 @@ function App() {
               documents.length === 0
             }
           >
-            {loading ? "Searching..." : "Ask"}
+            {loading
+              ? "Searching..."
+              : "Ask"}
           </button>
 
           {questionError && (
@@ -621,6 +713,7 @@ function App() {
               {questionError}
             </p>
           )}
+
         </div>
 
       </div>

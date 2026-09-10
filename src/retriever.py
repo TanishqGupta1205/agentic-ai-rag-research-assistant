@@ -37,7 +37,20 @@ def retrieve_documents(query, embeddings_model, index, documents, all_chunks, to
         "segmentation",
         "region-based",
         "region",
-        "object detection"
+        "object detection",
+        "conclusion",
+        "conclusions",
+        "finding",
+        "findings",
+        "future",
+        "method",
+        "methods",
+        "application",
+        "applications",
+        "result",
+        "results",
+        "objective",
+        "objectives",
     }
 
     for i, distance in zip(indices[0], distances[0]):
@@ -59,6 +72,41 @@ def retrieve_documents(query, embeddings_model, index, documents, all_chunks, to
             if word in text:
                 keyword_score += 2
 
+        # Stronger priority for section-specific questions
+        if "conclusion" in query.lower() and "conclusion" in text:
+            keyword_score += 5
+
+        if (
+            "finding" in query.lower()
+            or "findings" in query.lower()
+        ) and (
+            "finding" in text
+            or "findings" in text
+            or "conclusion" in text
+        ):
+            keyword_score += 4
+
+        if "future" in query.lower() and "future" in text:
+            keyword_score += 4
+
+        if (
+            "method" in query.lower()
+            or "methods" in query.lower()
+        ) and (
+            "method" in text
+            or "methods" in text
+        ):
+            keyword_score += 4
+
+        if (
+            "application" in query.lower()
+            or "applications" in query.lower()
+        ) and (
+            "application" in text
+            or "applications" in text
+        ):
+            keyword_score += 4
+
         candidates.append(
             (
                 keyword_score,
@@ -74,7 +122,7 @@ def retrieve_documents(query, embeddings_model, index, documents, all_chunks, to
 
     semantic_candidates = candidates[:50]
 
-    # Then use keywords to rerank only those candidates
+    # Then use keywords to rerank candidates
     semantic_candidates.sort(
         key=lambda x: (-x[0], x[1])
     )
