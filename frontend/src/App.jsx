@@ -20,7 +20,10 @@ function App() {
   const [chatHistory, setChatHistory] = useState([]);
   const [uploadStatus, setUploadStatus] = useState("");
   const [questionError, setQuestionError] = useState("");
+  const [agentProcess, setAgentProcess] = useState([]);
+  const [openAgentProcess, setOpenAgentProcess] = useState(null);
   const fileInputRef = useRef(null);
+
   // Ask a question
   const askQuestion = async () => {
     if (!question.trim()) {
@@ -29,66 +32,143 @@ function App() {
     }
 
     if (documents.length === 0) {
+      setQuestionError("Please upload a research paper first.");
+      return;
+    }
+
+    if (loading) {
       return;
     }
 
     const currentQuestion = question.trim();
-
+    let currentProcess = [];
     setLoading(true);
-
-    setAnswer("");
-    setSources("");
-    setContextScore("");
-    setAnswerScore("");
-    setFaithfulnessScore("");
+    setQuestionError("");
     setUploadMessage("");
-
+    setAgentProcess([]);
     try {
-      const response = await fetch("http://localhost:8000/ask", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: currentQuestion,
-        }),
-      });
-
-      const data = await response.json();
-
+      const response = await fetch(
+        "http://localhost:8000/ask-stream",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            question: currentQuestion,
+          }),
+        }
+      );
       if (!response.ok) {
-        setAnswer(data.detail || "Failed to get answer.");
+        const errorText = await response.text();
+        setQuestionError(
+          errorText || "Failed to connect to the research agent."
+        );
         return;
       }
 
-      setAnswer(data.answer || "");
-      setSources(data.sources || "");
-      setContextScore(data.context_score || "");
-      setAnswerScore(data.answer_score || "");
-      setFaithfulnessScore(data.faithfulness_score || "");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-      // Save complete conversation
-      setChatHistory((previousHistory) => [
-        ...previousHistory,
-        {
-          question: currentQuestion,
-          answer: data.answer || "",
-          sources: data.sources || "",
-          contextScore: data.context_score || "",
-          answerScore: data.answer_score || "",
-          faithfulnessScore: data.faithfulness_score || "",
-          agentProcess: data.process || [],
-        },
-      ]);
+      let buffer = "";
 
-      setQuestion("");
-      setQuestionError("");
+      while (true) {
+        const { value, done } = await reader.read();
 
-    } catch (error) {
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, {
+          stream: true,
+        });
+
+        const events = buffer.split("\n\n");
+
+        buffer = events.pop() || "";
+
+        for (const event of events) {
+          if (!event.trim()) {
+            continue;
+          }
+
+          let eventType = "";
+          let eventData = "";
+
+          const lines = event.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              eventType = line.slice(6).trim();
+            }
+
+            if (line.startsWith("data:")) {
+              eventData += line.slice(5).trim();
+            }
+          }
+
+          // Live Agent Process
+          if (eventType === "step") {
+            const step = JSON.parse(eventData);
+
+            currentProcess.push(step);
+
+            setAgentProcess([...currentProcess]);
+
+            // Allow React to render each step
+            await new Promise((resolve) =>
+              setTimeout(resolve, 10)
+            );
+          }
+
+          // Final result
+          if (eventType === "result") {
+            const data = JSON.parse(eventData);
+
+            setAnswer(data.answer || "");
+            setSources(data.sources || "");
+            setContextScore(data.context_score ?? "");
+            setAnswerScore(data.answer_score ?? "");
+            setFaithfulnessScore(
+              data.faithfulness_score ?? ""
+            );
+
+            setChatHistory((previousHistory) => [
+              ...previousHistory,
+              {
+                question: currentQuestion,
+                answer: data.answer || "",
+                sources: data.sources || "",
+                contextScore: data.context_score ?? "",
+                answerScore: data.answer_score ?? "",
+                faithfulnessScore:
+                  data.faithfulness_score ?? "",
+                agentProcess: [...currentProcess],
+              },
+            ]);
+
+            setQuestion("");
+            setQuestionError("");
+          }
+
+          // Backend error
+          if (eventType === "error") {
+            const message = JSON.parse(eventData);
+
+            currentProcess.push(`❌ ${message}`);
+            setAgentProcess([...currentProcess]);
+            setQuestionError(message);
+          }
+        }
+      }
+    }
+    catch (error) {
       console.error(error);
-      setAnswer("Unable to connect to the backend.");
-
-    } finally {
+      setQuestionError(
+        error.message || "Unable to connect to the backend."
+      );
+    } 
+    finally {
       setLoading(false);
     }
   };
@@ -99,6 +179,7 @@ function App() {
       setUploadMessage("Please select a PDF first.");
       return;
     }
+
     if (
       file.type !== "application/pdf" &&
       !file.name.toLowerCase().endsWith(".pdf")
@@ -107,23 +188,31 @@ function App() {
       setUploadStatus("Upload failed.");
       return;
     }
+
     if (uploading) {
       return;
     }
 
     setUploading(true);
     setUploadStatus("Uploading PDF...");
+
     const formData = new FormData();
     formData.append("files", file);
-    await new Promise((resolve) => setTimeout(resolve, 500));
 
+    await new Promise((resolve) =>
+      setTimeout(resolve, 500)
+    );
 
     setUploadStatus("Processing PDF...");
+
     try {
-      const response = await fetch("http://localhost:8000/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        "http://localhost:8000/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
@@ -146,18 +235,23 @@ function App() {
               newDocuments.push(uploadedFile);
             }
           });
+
           return newDocuments;
         });
       }
+
       setUploadStatus("PDF ready ✓");
+
       // Clear selected file
       setFile(null);
 
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (error) {
       console.error(error);
       setUploadMessage("Error connecting to the backend.");
       setUploadStatus("Upload failed.");
-
     } finally {
       setUploading(false);
     }
@@ -165,16 +259,21 @@ function App() {
 
   // Clear documents
   const clearDocuments = async () => {
-    const confirmClear=window.confirm(
+    const confirmClear = window.confirm(
       "Are you sure you want to clear all documents and chat history?"
     );
-    if(!confirm){
+
+    if (!confirmClear) {
       return;
     }
+
     try {
-      const response = await fetch("http://localhost:8000/clear", {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        "http://localhost:8000/clear",
+        {
+          method: "DELETE",
+        }
+      );
 
       const data = await response.json();
 
@@ -192,15 +291,18 @@ function App() {
       setAnswerScore("");
       setFaithfulnessScore("");
       setQuestion("");
+      setQuestionError("");
       setUploadStatus("");
+      setAgentProcess([]);
       setFile(null);
+
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+
       setUploadMessage(
         data.message || "Documents cleared successfully."
       );
-
     } catch (error) {
       console.error(error);
       setUploadMessage("Error connecting to the backend.");
@@ -224,36 +326,41 @@ function App() {
         {/* Upload Section */}
         <div className="upload-section">
           <h2>Upload Research Paper</h2>
+
           <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,application/pdf"
-          onChange={(e) => {
-            const selectedFile = e.target.files[0];
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            onChange={(e) => {
+              const selectedFile = e.target.files[0];
 
-            if (!selectedFile) {
-              return;
-            }
-
-            if (
-              selectedFile.type !== "application/pdf" &&
-              !selectedFile.name.toLowerCase().endsWith(".pdf")
-            ) {
-              setFile(null);
-              setUploadMessage("Please upload a PDF file.");
-
-              if (fileInputRef.current) {
-                fileInputRef.current.value = "";
+              if (!selectedFile) {
+                return;
               }
 
-              return;
-            }
+              if (
+                selectedFile.type !== "application/pdf" &&
+                !selectedFile.name
+                  .toLowerCase()
+                  .endsWith(".pdf")
+              ) {
+                setFile(null);
+                setUploadMessage(
+                  "Please upload a PDF file."
+                );
 
-            setFile(selectedFile);
-            setUploadMessage("");
-          }}
-          disabled={uploading}
-        />
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = "";
+                }
+
+                return;
+              }
+
+              setFile(selectedFile);
+              setUploadMessage("");
+            }}
+            disabled={uploading}
+          />
 
           <button
             type="button"
@@ -262,17 +369,20 @@ function App() {
           >
             {uploading ? "Uploading..." : "Upload PDF"}
           </button>
+
           {uploadMessage && (
-  <p className="upload-message">
-    {uploadMessage}
-  </p>
-)}
+            <p className="upload-message">
+              {uploadMessage}
+            </p>
+          )}
         </div>
+
         {uploadStatus && (
           <p className="upload-status">
             {uploadStatus}
           </p>
         )}
+
         {/* Documents Section */}
         <div className="documents-section">
           <div className="documents-header">
@@ -313,7 +423,6 @@ function App() {
           </div>
         )}
 
-
         {/* Chat History */}
         {chatHistory.length > 0 && (
           <div className="chat-history">
@@ -347,49 +456,70 @@ function App() {
                 {/* Right Panel */}
                 <aside className="side-panel">
 
+
                   {/* Agent Process */}
-                  <div className="info-card">
-                    <h3>Agent Process</h3>
+              <div className="info-card">
+                <h3>Agent Process</h3>
 
-                    <div className="agent-process">
-                      {chat.agentProcess &&
-                      chat.agentProcess.length > 0 ? (
-                        chat.agentProcess.map(
-                          (step, stepIndex) => (
-                            <div
-                              className="process-step"
-                              key={stepIndex}
-                            >
-                              {step}
-                            </div>
-                          )
+                <button
+                  className="view-process-button"
+                  onClick={() => {
+                    setOpenAgentProcess(
+                      openAgentProcess === index ? null : index
+                    );
+                  }}
+                >
+                  {openAgentProcess === index
+                    ? "Hide Agent Process ▲"
+                    : "View Agent Process ▼"}
+                </button>
+
+                {openAgentProcess === index && (
+                  <div className="agent-process">
+                    {chat.agentProcess &&
+                    chat.agentProcess.length > 0 ? (
+                      chat.agentProcess.map(
+                        (step, stepIndex) => (
+                          <div
+                            className="process-step"
+                            key={stepIndex}
+                          >
+                            {step}
+                          </div>
                         )
-                      ) : (
-                        <p>No process information available.</p>
-                      )}
-                    </div>
+                      )
+                    ) : (
+                      <p>No process information available.</p>
+                    )}
                   </div>
-
+                )}
+              </div>
                   {/* Evaluation */}
                   <div className="info-card">
                     <h3>Evaluation</h3>
 
                     <div className="score">
-                      <span>Context Relevance</span>
+                      <span>
+                        Context Relevance
+                      </span>
                       <strong>
                         {chat.contextScore || "N/A"}
                       </strong>
                     </div>
 
                     <div className="score">
-                      <span>Answer Relevance</span>
+                      <span>
+                        Answer Relevance
+                      </span>
                       <strong>
                         {chat.answerScore || "N/A"}
                       </strong>
                     </div>
 
                     <div className="score">
-                      <span>Faithfulness</span>
+                      <span>
+                        Faithfulness
+                      </span>
                       <strong>
                         {chat.faithfulnessScore || "N/A"}
                       </strong>
@@ -412,7 +542,9 @@ function App() {
                             )
                           )
                       ) : (
-                        <p>No sources available.</p>
+                        <p>
+                          No sources available.
+                        </p>
                       )}
                     </div>
                   </div>
@@ -422,6 +554,30 @@ function App() {
               </div>
             ))}
 
+          </div>
+        )}
+
+        {/* Live Agent Process */}
+        {loading && (
+          <div className="info-card">
+            <h3>Agent Process</h3>
+
+            <div className="agent-process">
+              {agentProcess.length === 0 ? (
+                <div className="process-step">
+                  Starting agent...
+                </div>
+              ) : (
+                agentProcess.map((step, index) => (
+                  <div
+                    className="process-step"
+                    key={index}
+                  >
+                    {step}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 
@@ -459,7 +615,8 @@ function App() {
           >
             {loading ? "Searching..." : "Ask"}
           </button>
-            {questionError && (
+
+          {questionError && (
             <p className="question-error">
               {questionError}
             </p>
