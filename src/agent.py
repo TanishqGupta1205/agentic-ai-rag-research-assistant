@@ -3,7 +3,7 @@ from src.llm import generate_answer
 from src.embeddings import embeddings_model
 from groq import Groq
 from src.evaluator import evaluate_context, evaluate_answer, evaluate_faithfulness
-MODEL = "openai/gpt-oss-120b"
+MODEL = "openai/gpt-oss-20b"
 
 client = Groq()
 

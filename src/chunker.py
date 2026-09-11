@@ -1,6 +1,7 @@
 def create_chunks(pages, source):
 
     chunk_size = 500
+    chunk_overlap = 100
 
     chunks = []
 
@@ -9,13 +10,20 @@ def create_chunks(pages, source):
         text = page["text"]
         page_number = page["page"]
 
-        for i in range(0, len(text), chunk_size):
+        start = 0
 
-            chunk = text[i:i + chunk_size]
+        while start < len(text):
+
+            end = start + chunk_size
+
+            chunk = text[start:end]
 
             chunks.append({
                 "text": chunk,
                 "page": page_number,
                 "source": source
             })
+
+            start += chunk_size - chunk_overlap
+
     return chunks
