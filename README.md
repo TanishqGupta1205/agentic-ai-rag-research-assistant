@@ -203,14 +203,6 @@ The system evaluates responses using:
 - **Answer Relevance** — how well the answer addresses the question.
 - **Faithfulness** — whether the answer is supported by the retrieved context.
 
-## 🔮 Future Improvements
-
-- Live Agent Process streaming
-- Better retrieval and reranking
-- Persistent vector database
-- User authentication
-- Cloud deployment
-- Improved citation handling
 
 ## 🎯 Project Goal
 
